@@ -6,11 +6,12 @@ from pyrogram.types import Message
 
 API_ID    = int(os.environ["TELEGRAM_API_ID"])
 API_HASH  = os.environ["TELEGRAM_API_HASH"]
+SESSION   = os.environ["SESSION_STRING"]
 WEBHOOK   = os.environ["WEBHOOK_URL"]
 SECRET    = os.environ["WEBHOOK_SECRET"]
 SOURCE    = os.environ.get("SOURCE_CHANNEL", "@WalterBloomberg")
 
-app = Client("sniper_forwarder", api_id=API_ID, api_hash=API_HASH)
+app = Client("sniper_forwarder", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
 @app.on_message(filters.channel & filters.chat(SOURCE))
 async def forward_to_webhook(client: Client, message: Message):
