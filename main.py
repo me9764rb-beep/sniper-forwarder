@@ -2,6 +2,7 @@ import asyncio
 import os
 import httpx
 from pyrogram import Client, filters, idle
+from pyrogram.handlers import MessageHandler
 from pyrogram.types import Message
 
 API_ID    = int(os.environ["TELEGRAM_API_ID"])
@@ -9,12 +10,17 @@ API_HASH  = os.environ["TELEGRAM_API_HASH"]
 SESSION   = os.environ["SESSION_STRING"]
 WEBHOOK   = os.environ["WEBHOOK_URL"]
 SECRET    = os.environ["WEBHOOK_SECRET"]
-SOURCE    = os.environ.get("SOURCE_CHANNEL", "@WalterBloomberg")
+SOURCE    = os.environ.get("SOURCE_CHANNEL", "@WalterBloomberg").lstrip('@').lower()
 
 app = Client("sniper_forwarder", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
-@app.on_message(filters.channel & filters.chat(SOURCE))
+
 async def forward_to_webhook(client: Client, message: Message):
+    # Filter by username — avoids peer-cache lookup that fails on stateless restarts
+    chat_username = (message.chat.username or '').lower()
+    if chat_username != SOURCE:
+        return
+
     text = message.text or message.caption
     if not text or len(text.strip()) < 5:
         return
@@ -47,9 +53,10 @@ async def forward_to_webhook(client: Client, message: Message):
 
 
 async def main():
-    print(f"Starting forwarder — listening to {SOURCE}")
+    print(f"Starting forwarder — listening to @{SOURCE}")
     await app.start()
     print("Connected to Telegram ✓")
+    app.add_handler(MessageHandler(forward_to_webhook, filters.channel))
     await idle()
     await app.stop()
 
