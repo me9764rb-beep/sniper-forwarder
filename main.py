@@ -2,28 +2,29 @@ import asyncio
 import os
 import httpx
 from pyrogram import Client, filters, idle
-from pyrogram.handlers import MessageHandler
 from pyrogram.types import Message
 
-API_ID    = int(os.environ["TELEGRAM_API_ID"])
-API_HASH  = os.environ["TELEGRAM_API_HASH"]
-SESSION   = os.environ["SESSION_STRING"]
-WEBHOOK   = os.environ["WEBHOOK_URL"]
-SECRET    = os.environ["WEBHOOK_SECRET"]
-SOURCE    = os.environ.get("SOURCE_CHANNEL", "@WalterBloomberg").lstrip('@').lower()
+API_ID  = int(os.environ["TELEGRAM_API_ID"])
+API_HASH = os.environ["TELEGRAM_API_HASH"]
+SESSION  = os.environ["SESSION_STRING"]
+WEBHOOK  = os.environ["WEBHOOK_URL"]
+SECRET   = os.environ["WEBHOOK_SECRET"]
+SOURCE   = os.environ.get("SOURCE_CHANNEL", "@WalterBloomberg").lstrip('@').lower()
 
 app = Client("sniper_forwarder", api_id=API_ID, api_hash=API_HASH, session_string=SESSION)
 
 
+@app.on_message(filters.channel)
 async def forward_to_webhook(client: Client, message: Message):
-    # Filter by username — avoids peer-cache lookup that fails on stateless restarts
-    chat_username = (message.chat.username or '').lower()
-    if chat_username != SOURCE:
+    # Compare username directly from the message object — no peer cache needed
+    if (message.chat.username or '').lower() != SOURCE:
         return
 
     text = message.text or message.caption
     if not text or len(text.strip()) < 5:
         return
+
+    print(f"[WB] New message: {text[:100]}")
 
     payload = {
         "channel_post": {
@@ -42,7 +43,7 @@ async def forward_to_webhook(client: Client, message: Message):
                     json=payload,
                     headers={"x-telegram-bot-api-secret-token": SECRET},
                 )
-            print(f"Forwarded [{r.status_code}]: {text[:80]}...")
+            print(f"Forwarded [{r.status_code}]: {text[:80]}")
             return
         except Exception as e:
             print(f"Webhook attempt {attempt + 1} failed: {e}")
@@ -56,9 +57,9 @@ async def main():
     print(f"Starting forwarder — listening to @{SOURCE}")
     await app.start()
     print("Connected to Telegram ✓")
-    app.add_handler(MessageHandler(forward_to_webhook, filters.channel))
     await idle()
     await app.stop()
+
 
 if __name__ == "__main__":
     app.run(main())
