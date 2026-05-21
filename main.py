@@ -61,11 +61,21 @@ async def forward_to_webhook(client: Client, message: Message):
 
 
 async def heartbeat():
-    """Logs a heartbeat every 10 minutes so Railway logs confirm the process is alive."""
     while True:
         await asyncio.sleep(600)
         idle_mins = int((time.time() - _last_message_ts) / 60)
         print(f"[HEARTBEAT] alive ✓ | forwarded: {_message_count} msgs | last WB message: {idle_mins}m ago")
+
+
+async def populate_peer_cache():
+    """Pre-load all dialogs into Pyrogram's peer cache.
+    Without this, updates from channels not yet seen in this session
+    raise 'Peer id invalid' and get silently dropped before our handler runs.
+    """
+    count = 0
+    async for _ in app.get_dialogs():
+        count += 1
+    print(f"[BOOT] Peer cache ready: {count} dialogs ✓")
 
 
 async def main():
@@ -76,7 +86,13 @@ async def main():
     me = await app.get_me()
     print(f"[BOOT] Logged in as: {me.first_name} (@{me.username}) ✓")
 
-    # Join the source channel (required to receive updates + cache peer ID)
+    # Critical: populate peer cache before listening — prevents 'Peer id invalid' crashes
+    try:
+        await populate_peer_cache()
+    except Exception as e:
+        print(f"[BOOT] Warning: peer cache population failed: {e}")
+
+    # Join the source channel (also populates its peer entry)
     try:
         await app.join_chat(SOURCE)
         print(f"[BOOT] Joined @{SOURCE} ✓")
